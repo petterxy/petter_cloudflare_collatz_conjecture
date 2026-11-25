@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>考拉兹猜想 · 无限飞行</title>
+<style>
+  :root{
+    --bg0:#070b14; --bg1:#0d1424;
+    --panel:rgba(16,26,48,.72); --border:#1e2c4a;
+    --txt:#dbe4f5; --muted:#8294b5;
+    --cyan:#4dd8ff; --gold:#f5c542; --green:#3ddc84;
+    --mono:"SF Mono",Menlo,Consolas,"Courier New",monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    color:var(--txt);
+    background:radial-gradient(1200px 700px at 70% -10%, #14224a 0%, var(--bg1) 45%, var(--bg0) 100%) fixed;
+    min-height:100vh;
+  }
+  .wrap{max-width:1280px;margin:0 auto;padding:22px 20px 40px}
+  header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px;flex-wrap:wrap}
+  .title{display:flex;align-items:center;gap:14px}
+  .logo{font-family:var(--mono);font-size:30px;font-weight:700;color:var(--cyan);
+    text-shadow:0 0 24px rgba(77,216,255,.55);line-height:1;white-space:nowrap}
+  h1{font-size:22px;font-weight:700;letter-spacing:.5px}
+  .sub{color:var(--muted);font-size:13px;margin-top:4px}
+  .badge{font-size:13px;padding:6px 14px;border-radius:999px;border:1px solid var(--border);
+    background:var(--panel);color:var(--green);white-space:nowrap}
+  .badge .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);
+    margin-right:6px;animation:pulse 1.6s infinite}
+  .badge.paused{color:var(--gold)}
+  .badge.paused .dot{background:var(--gold);animation:none}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+  main{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start}
+  @media (max-width:980px){main{grid-template-columns:1fr}}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+  .panel-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;
+    padding:12px 16px;border-bottom:1px solid var(--border)}
+  .panel-head h2{font-size:14px;font-weight:600}
+  .panel-head span{font-size:12px;color:var(--muted);font-family:var(--mono)}
+  canvas{display:block;width:100%}
+  #flightCanvas{height:420px}
+  #scatterCanvas{height:240px}
+  .viz{display:flex;flex-direction:column;gap:16px;min-width:0}
+
+  aside{display:flex;flex-direction:column;gap:14px}
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .stat{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px 14px}
+  .stat-label{font-size:11px;color:var(--muted);margin-bottom:6px}
+  .stat-value{font-family:var(--mono);font-size:19px;font-weight:700;color:var(--cyan)}
+  .stat-value.gold{color:var(--gold)}
+  .stat-value.small{font-size:13px;line-height:1.5}
+
+  .controls{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px}
+  .btn-row{display:flex;gap:10px;margin-bottom:12px}
+  button{flex:1;font-size:14px;padding:9px 0;border-radius:9px;cursor:pointer;
+    border:1px solid var(--border);background:#16223c;color:var(--txt);
+    transition:background .15s,border-color .15s}
+  button:hover{background:#1d2e50;border-color:#2c4270}
+  button.primary{background:rgba(77,216,255,.14);border-color:rgba(77,216,255,.45);color:var(--cyan)}
+  .speed-row{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted)}
+  .speed-row input{flex:1;accent-color:var(--cyan)}
+  .speed-val{font-family:var(--mono);color:var(--txt);min-width:76px;text-align:right}
+  .rate{font-size:12px;color:var(--muted);margin-top:10px}
+  .rate b{color:var(--txt);font-family:var(--mono)}
+
+  .feed-head{display:flex;justify-content:space-between;align-items:baseline;padding:12px 16px;border-bottom:1px solid var(--border)}
+  .feed-head h2{font-size:14px;font-weight:600}
+  .feed-head span{font-size:12px;color:var(--muted)}
+  #recordFeed{list-style:none;max-height:300px;overflow-y:auto;padding:6px 0}
+  #recordFeed li{display:flex;justify-content:space-between;align-items:baseline;gap:8px;
+    padding:6px 16px;font-family:var(--mono);font-size:12.5px;border-bottom:1px dashed rgba(30,44,74,.6)}
+  #recordFeed li:first-child{background:rgba(245,197,66,.07)}
+  #recordFeed .tag{color:var(--gold);white-space:nowrap}
+  #recordFeed .val{color:var(--txt);text-align:right}
+  #recordFeed .empty{color:var(--muted);justify-content:center;font-family:inherit}
+
+  .claim{border:1px solid rgba(61,220,132,.35);background:rgba(61,220,132,.08);
+    color:var(--green);border-radius:12px;padding:12px 14px;font-size:13px;line-height:1.6}
+  footer{margin-top:22px;border-top:1px solid var(--border);padding-top:18px;
+    color:var(--muted);font-size:13px;line-height:1.9}
+  footer h3{color:var(--txt);font-size:14px;margin-bottom:8px}
+  footer p{margin-bottom:8px}
+  footer .fine{font-size:12px;opacity:.85}
+  footer code{font-family:var(--mono);color:var(--cyan);font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="title">
+      <span class="logo">3n+1</span>
+      <div>
+        <h1>考拉兹猜想 · 无限飞行</h1>
+        <p class="sub">每个正整数起飞：偶数 ÷2，奇数 ×3+1 —— 它们是否永远坠回 1？逐个验证，永不停止</p>
+      </div>
+    </div>
+    <div class="badge" id="statusBadge"><span class="dot"></span><span id="statusText">飞行中</span></div>
+  </header>
+
+  <main>
+    <section class="viz">
+      <div class="panel">
+        <div class="panel-head"><h2>冰雹飞行轨迹（对数高度）</h2><span id="flightInfo">n=2 · 第 0 步</span></div>
+        <canvas id="flightCanvas"></canvas>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h2>停止时间全景</h2><span>每个点是一个整数：横轴 n，纵轴坠回 1 的步数</span></div>
+        <canvas id="scatterCanvas"></canvas>
+      </div>
+    </section>
+
+    <aside>
+      <div class="stats">
+        <div class="stat"><div class="stat-label">已测试整数</div><div class="stat-value" id="statTested">0</div></div>
+        <div class="stat"><div class="stat-label">当前 n</div><div class="stat-value" id="statN">2</div></div>
+        <div class="stat"><div class="stat-label">🏆 最长飞行</div><div class="stat-value gold small" id="statRecSteps">—</div></div>
+        <div class="stat"><div class="stat-label">🏆 最高峰值</div><div class="stat-value gold small" id="statRecPeak">—</div></div>
+      </div>
+
+      <div class="controls">
+        <div class="btn-row">
+          <button class="primary" id="pauseBtn">⏸ 暂停</button>
+          <button id="resetBtn">↺ 重置</button>
+        </div>
+        <div class="speed-row">
+          <span>速度</span>
+          <input type="range" id="speedSlider" min="20" max="2000" step="20" value="300">
+          <span class="speed-val" id="speedVal">300 步/秒</span>
+        </div>
+        <div class="rate">完成速率：<b id="statRate">0</b> 个/分 · BigInt 精确计算，无溢出</div>
+      </div>
+
+      <div class="panel">
+        <div class="feed-head"><h2>纪录诞生</h2><span>最新在上</span></div>
+        <ol id="recordFeed"><li class="empty">等待第一项纪录…</li></ol>
+      </div>
+
+      <div class="claim" id="claimBox">✓ 起飞的每一个整数都回到了 1</div>
+    </aside>
+  </main>
+
+  <footer>
+    <h3>这个页面在做什么？</h3>
+    <p><b style="color:var(--txt)">考拉兹猜想（1937）</b>：任取正整数 n，偶数则 ÷2，奇数则 ×3+1，反复迭代。猜想断言：<b style="color:var(--txt)">无论从哪里起飞，最终都会坠回 1</b>。它看起来像小学数学，却难倒了整个数学界——Erdős 说："数学还没有准备好面对这样的问题。"（悬赏 500 美元）</p>
+    <p>本页把猜想变成一场<b style="color:var(--txt)">无限延续的飞行表演</b>：从 n=2 开始逐个起飞，实时画出每条冰雹轨迹（纵轴为对数高度），坠回 1 后立即测试下一个整数，永远继续。途中诞生的"最长飞行"与"最高峰值"纪录会被记入右侧榜单。全程使用 BigInt 精确整数运算，峰值再大也不会溢出。</p>
+    <p class="fine">诚实声明：计算机已验证所有 n ≤ 2⁶⁸ ≈ 2.95×10²⁰ 都回到 1，但猜想至今<b>没有被证明</b>——本页面是数值探索与可视化，不是证明。纯静态单文件，无任何外部依赖，可直接部署到 Cloudflare Pages / GitHub Pages。</p>
+  </footer>
+</div>
+
+<script>
+'use strict';
+/* ================= 工具 ================= */
+const SUP = {'0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹','-':'⁻'};
+const sup = n => String(n).split('').map(c=>SUP[c]||c).join('');
+function fmtBig(v){
+  const s = v.toString();
+  if (s.length <= 9) return s;
+  return s[0]+'.'+s.slice(1,4)+'×10'+sup(s.length-1);
+}
+function log10Big(v){
+  const s = v.toString();
+  if (s.length <= 15) return Math.log10(Number(v));
+  return (s.length-1) + Math.log10(parseFloat(s.slice(0,15))/1e14);
+}
+
+/* ================= 状态 ================= */
+const SCATTER_W = 600;
+const state = {
+  n: 2, v: 2n, steps: 0, peak: 2n, peakStep: 0,
+  path: [{i:0, lv:0}],
+  running: true, speed: 300,
+  done: [], tested: 0, finishTimes: [],
+  recSteps: {n:0, steps:0}, recPeak: {n:0, peak:0n},
+  lastFrame: 0,
+};
+
+const $ = id => document.getElementById(id);
+const flightCanvas = $('flightCanvas'), scatterCanvas = $('scatterCanvas');
+const fctx = flightCanvas.getContext('2d'), sctx = scatterCanvas.getContext('2d');
+const feed = $('recordFeed');
+const MONO = '"SF Mono",Menlo,Consolas,monospace';
+
+function fitCanvas(cv){
+  const dpr = window.devicePixelRatio || 1;
+  const w = cv.clientWidth, h = cv.clientHeight;
+  if (cv.width !== Math.round(w*dpr) || cv.height !== Math.round(h*dpr)){
+    cv.width = Math.round(w*dpr); cv.height = Math.round(h*dpr);
+  }
+  cv.getContext('2d').setTransform(dpr,0,0,dpr,0,0);
+  return {w,h};
+}
+
+function addFeed(tag, n, steps, peak){
+  const empty = feed.querySelector('.empty'); if (empty) empty.remove();
+  const li = document.createElement('li');
+  li.innerHTML = '<span class="tag">🏆 '+tag+' n='+n+'</span><span class="val">'+steps+' 步 · 峰值 '+fmtBig(peak)+'</span>';
+  feed.prepend(li);
+  while (feed.children.length > 30) feed.lastChild.remove();
+}
+
+function finish(){
+  const rec = {n: state.n, steps: state.steps, peakLog: log10Big(state.peak)};
+  if (state.steps > state.recSteps.steps){
+    state.recSteps = {n: state.n, steps: state.steps};
+    addFeed('最长飞行', state.n, state.steps, state.peak);
+    $('statRecSteps').textContent = state.steps+' 步 · n='+state.n;
+  }
+  if (state.peak > state.recPeak.peak){
+    state.recPeak = {n: state.n, peak: state.peak};
+    addFeed('最高峰值', state.n, state.steps, state.peak);
+    $('statRecPeak').textContent = fmtBig(state.peak)+' · n='+state.n;
+  }
+  state.done.push(rec);
+  if (state.done.length > 6000) state.done.splice(0, state.done.length-6000);
+  state.tested++;
+  state.finishTimes.push(performance.now());
+  $('statTested').textContent = state.tested;
+  $('claimBox').textContent = '✓ 已测试 '+state.tested+' 个正整数，全部回到 1';
+  // 下一个整数起飞
+  state.n++; state.v = BigInt(state.n);
+  state.steps = 0; state.peak = state.v; state.peakStep = 0;
+  state.path = [{i:0, lv: log10Big(state.v)}];
+}
+
+function doStep(){
+  state.v = (state.v % 2n === 0n) ? state.v/2n : 3n*state.v + 1n;
+  state.steps++;
+  if (state.v > state.peak){ state.peak = state.v; state.peakStep = state.steps; }
+  state.path.push({i: state.steps, lv: log10Big(state.v)});
+  if (state.v === 1n) finish();
+}
+
+function advance(dt){
+  let budget = state.speed * dt, guard = 0;
+  while (budget > 0 && guard < 8000){ doStep(); budget--; guard++; }
+}
+
+/* ================= 绘制 ================= */
+function drawFlight(){
+  const {w,h} = fitCanvas(flightCanvas);
+  fctx.clearRect(0,0,w,h);
+  const padL = 56, padR = 20, padT = 16, padB = 28;
+  const xMax = Math.max(50, state.steps + 3);
+  let lvMax = 2;
+  for (const p of state.path) if (p.lv > lvMax) lvMax = p.lv;
+  lvMax *= 1.12;
+  const xOf = i => padL + i/xMax*(w-padL-padR);
+  const yOf = lv => padT + (lvMax-lv)/lvMax*(h-padT-padB);
+
+  // 对数网格 10^k
+  fctx.font = '11px '+MONO;
+  for (let k=0; k<=Math.ceil(lvMax); k++){
+    const y = yOf(k);
+    if (y < padT-1) continue;
+    fctx.strokeStyle = k===0 ? 'rgba(61,220,132,.55)' : 'rgba(30,44,74,.9)';
+    fctx.lineWidth = k===0 ? 1.4 : 1;
+    fctx.beginPath(); fctx.moveTo(padL,y); fctx.lineTo(w-padR,y); fctx.stroke();
+    fctx.fillStyle = k===0 ? 'rgba(61,220,132,.9)' : 'rgba(130,148,181,.8)';
+    fctx.fillText(k===0 ? '1' : '10'+sup(k), 10, y+4);
+  }
+  // x 刻度
+  const gx = xMax>400 ? 100 : xMax>150 ? 50 : 10;
+  for (let g=0; g<=xMax; g+=gx){
+    fctx.fillStyle = 'rgba(130,148,181,.7)';
+    fctx.fillText(String(g), xOf(g)-6, h-8);
+  }
+  fctx.fillText('步数 →', w-padR-46, h-8);
+
+  // 轨迹
+  fctx.strokeStyle = '#4dd8ff'; fctx.lineWidth = 1.7;
+  fctx.shadowColor = 'rgba(77,216,255,.5)'; fctx.shadowBlur = 7;
+  fctx.beginPath();
+  state.path.forEach((p,idx) => {
+    const x = xOf(p.i), y = yOf(p.lv);
+    idx===0 ? fctx.moveTo(x,y) : fctx.lineTo(x,y);
+  });
+  fctx.stroke(); fctx.shadowBlur = 0;
+
+  // 峰值标记
+  if (state.peakStep > 0){
+    const px = xOf(state.peakStep), py = yOf(log10Big(state.peak));
+    fctx.fillStyle = '#f5c542';
+    fctx.shadowColor = 'rgba(245,197,66,.9)'; fctx.shadowBlur = 9;
+    fctx.beginPath(); fctx.arc(px,py,3.4,0,2*Math.PI); fctx.fill();
+    fctx.shadowBlur = 0;
+    fctx.font = '11px '+MONO; fctx.fillStyle = 'rgba(245,197,66,.95)';
+    const label = '峰值 '+fmtBig(state.peak);
+    fctx.fillText(label, Math.min(px+8, w-padR-90), Math.max(py-8, padT+10));
+  }
+  // 当前点
+  const head = state.path[state.path.length-1];
+  fctx.fillStyle = '#dbe4f5';
+  fctx.shadowColor = 'rgba(219,228,245,.9)'; fctx.shadowBlur = 8;
+  fctx.beginPath(); fctx.arc(xOf(head.i), yOf(head.lv), 3, 0, 2*Math.PI); fctx.fill();
+  fctx.shadowBlur = 0;
+
+  $('flightInfo').textContent = 'n='+state.n+' · 第 '+state.steps+' 步 · 当前值 '+fmtBig(state.v);
+}
+
+function drawScatter(){
+  const {w,h} = fitCanvas(scatterCanvas);
+  sctx.clearRect(0,0,w,h);
+  const padL = 56, padR = 20, padT = 14, padB = 26;
+  const nRight = state.n + 5, nLeft = Math.max(2, state.n - SCATTER_W);
+  let sMax = 50;
+  const pts = [];
+  for (let i=state.done.length-1; i>=0; i--){
+    const d = state.done[i];
+    if (d.n < nLeft) break;
+    pts.push(d);
+    if (d.steps > sMax) sMax = d.steps;
+  }
+  sMax *= 1.1;
+  const xOf = n => padL + (n-nLeft)/(nRight-nLeft)*(w-padL-padR);
+  const yOf = s => padT + (sMax-s)/sMax*(h-padT-padB);
+
+  sctx.font = '11px '+MONO;
+  const gy = sMax>300 ? 100 : sMax>120 ? 50 : 20;
+  for (let g=0; g<=sMax; g+=gy){
+    const y = yOf(g);
+    sctx.strokeStyle = 'rgba(30,44,74,.9)'; sctx.lineWidth = 1;
+    sctx.beginPath(); sctx.moveTo(padL,y); sctx.lineTo(w-padR,y); sctx.stroke();
+    sctx.fillStyle = 'rgba(130,148,181,.8)';
+    sctx.fillText(String(g), 18, y+4);
+  }
+  const gxn = SCATTER_W>400 ? 100 : 50;
+  for (let g=Math.ceil(nLeft/gxn)*gxn; g<=nRight; g+=gxn){
+    sctx.fillStyle = 'rgba(130,148,181,.7)';
+    sctx.fillText(String(g), xOf(g)-10, h-7);
+  }
+  // 散点：步数越多越偏金
+  for (const d of pts){
+    const r = Math.min(1, d.steps/sMax);
+    sctx.fillStyle = 'hsl('+(190-145*r)+',90%,62%)';
+    sctx.beginPath(); sctx.arc(xOf(d.n), yOf(d.steps), 1.8, 0, 2*Math.PI); sctx.fill();
+  }
+  // 纪录保持者
+  for (const rec of [state.recSteps.n, state.recPeak.n]){
+    if (rec >= nLeft && rec <= nRight && rec > 0){
+      const d = state.done.find(x=>x.n===rec);
+      if (d){
+        sctx.strokeStyle = '#f5c542'; sctx.lineWidth = 1.5;
+        sctx.beginPath(); sctx.arc(xOf(d.n), yOf(d.steps), 5, 0, 2*Math.PI); sctx.stroke();
+      }
+    }
+  }
+}
+
+function updateStats(){
+  $('statN').textContent = state.n;
+  const cutoff = performance.now() - 60000;
+  while (state.finishTimes.length && state.finishTimes[0] < cutoff) state.finishTimes.shift();
+  $('statRate').textContent = state.finishTimes.length;
+}
+
+/* ================= 主循环 ================= */
+function frame(now){
+  if (!state.lastFrame) state.lastFrame = now;
+  const dt = Math.min((now - state.lastFrame)/1000, 0.1);
+  state.lastFrame = now;
+  if (state.running) advance(dt);
+  drawFlight(); drawScatter(); updateStats();
+  requestAnimationFrame(frame);
+}
+
+/* ================= 控件 ================= */
+$('pauseBtn').addEventListener('click', () => {
+  state.running = !state.running;
+  $('pauseBtn').textContent = state.running ? '⏸ 暂停' : '▶ 继续';
+  $('statusBadge').classList.toggle('paused', !state.running);
+  $('statusText').textContent = state.running ? '飞行中' : '已暂停';
+});
+$('resetBtn').addEventListener('click', () => {
+  Object.assign(state, {
+    n:2, v:2n, steps:0, peak:2n, peakStep:0, path:[{i:0,lv:0}],
+    done:[], tested:0, finishTimes:[],
+    recSteps:{n:0,steps:0}, recPeak:{n:0,peak:0n},
+  });
+  feed.innerHTML = '<li class="empty">等待第一项纪录…</li>';
+  $('statTested').textContent = '0'; $('statN').textContent = '2';
+  $('statRecSteps').textContent = '—'; $('statRecPeak').textContent = '—';
+  $('claimBox').textContent = '✓ 起飞的每一个整数都回到了 1';
+});
+$('speedSlider').addEventListener('input', e => {
+  state.speed = +e.target.value;
+  $('speedVal').textContent = state.speed + ' 步/秒';
+});
+window.addEventListener('resize', () => { drawFlight(); drawScatter(); });
+
+requestAnimationFrame(frame);
+
+// 后台标签页里 rAF 会被浏览器节流：用低频定时器兜底，保证"无限飞行"不中断
+setInterval(() => {
+  const now = performance.now();
+  if (state.running && now - state.lastFrame > 500){
+    const dt = Math.min((now - state.lastFrame)/1000, 1);
+    state.lastFrame = now;
+    advance(dt);
+    drawFlight(); drawScatter(); updateStats();
+  }
+}, 1000);
+</script>
+</body>
+</html>
